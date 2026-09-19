@@ -1,0 +1,480 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  STUDENT
+  ADMIN
+}
+
+enum EducationLevel {
+  CLASS_10
+  CLASS_12
+  DIPLOMA
+  UNDERGRADUATE
+  POSTGRADUATE
+  GRADUATE
+  WORKING_PROFESSIONAL
+  OTHER
+}
+
+enum CareerDifficulty {
+  FOUNDATION
+  MODERATE
+  ADVANCED
+}
+
+enum DemandLevel {
+  LOW
+  MODERATE
+  HIGH
+  VERY_HIGH
+}
+
+enum AssessmentStatus {
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+}
+
+enum AssessmentDimension {
+  INTEREST
+  SKILL
+  PERSONALITY
+  VALUE
+  WORK_PREFERENCE
+}
+
+enum RoadmapItemType {
+  LEARNING
+  PROJECT
+  CERTIFICATION
+  CAREER_PREPARATION
+}
+
+enum MessageRole {
+  SYSTEM
+  USER
+  ASSISTANT
+}
+
+enum GoalStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  PAUSED
+}
+
+model User {
+  id                       String                   @id @default(cuid())
+  email                    String                   @unique
+  passwordHash             String
+  name                     String
+  role                     UserRole                 @default(STUDENT)
+  profile                  Profile?
+  sessions                 Session[]
+  assessments              Assessment[]
+  savedCareers             SavedCareer[]
+  roadmapProgress          UserRoadmapProgress[]
+  counsellingConversations CounsellingConversation[]
+  createdAt                DateTime                 @default(now())
+  updatedAt                DateTime                 @updatedAt
+
+  @@index([role])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model Profile {
+  id                   String            @id @default(cuid())
+  userId               String            @unique
+  age                  Int?
+  location             String?
+  preferredLanguage    String            @default("English")
+  bio                  String?           @db.Text
+  targetGraduationYear Int?
+  user                 User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  education            Education?
+  interests            ProfileInterest[]
+  skills               ProfileSkill[]
+  workPreference       WorkPreference?
+  goals                CareerGoal[]
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+}
+
+model Education {
+  id              String         @id @default(cuid())
+  profileId       String         @unique
+  educationLevel  EducationLevel
+  stream          String?
+  degree          String?
+  branch          String?
+  institutionName String?
+  percentage      Float?
+  cgpa            Float?
+  graduationYear  Int?
+  profile         Profile        @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+model Interest {
+  id          String            @id @default(cuid())
+  slug        String            @unique
+  name        String
+  description String?           @db.Text
+  profiles    ProfileInterest[]
+  careers     CareerInterest[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+model ProfileInterest {
+  profileId String
+  interestId String
+  strength  Int               @default(50)
+  profile   Profile           @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  interest  Interest          @relation(fields: [interestId], references: [id], onDelete: Cascade)
+
+  @@id([profileId, interestId])
+  @@index([interestId])
+}
+
+model Skill {
+  id          String         @id @default(cuid())
+  slug        String         @unique
+  name        String
+  category    String?
+  description String?        @db.Text
+  profiles    ProfileSkill[]
+  careers     CareerSkill[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}
+
+model ProfileSkill {
+  profileId   String
+  skillId     String
+  proficiency Int            @default(0)
+  profile     Profile        @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  skill       Skill          @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@id([profileId, skillId])
+  @@index([skillId])
+}
+
+model WorkPreference {
+  id                           String   @id @default(cuid())
+  profileId                    String   @unique
+  peopleVsSystems              Int      @default(50)
+  analyticalVsCreative         Int      @default(50)
+  stabilityVsFlexibility       Int      @default(50)
+  leadershipInterest           Int      @default(50)
+  governmentVsPrivate          Int      @default(50)
+  remoteHybridPreference       Int      @default(50)
+  salaryImportance             Int      @default(50)
+  workLifeBalanceImportance    Int      @default(50)
+  socialImpactImportance       Int      @default(50)
+  independencePreference       Int      @default(50)
+  profile                      Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  createdAt                    DateTime @default(now())
+  updatedAt                    DateTime @updatedAt
+}
+
+model CareerCategory {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  description String?  @db.Text
+  careers     Career[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Career {
+  id                    String            @id @default(cuid())
+  slug                  String            @unique
+  name                  String
+  categoryId            String
+  overview              String            @db.Text
+  whatProfessionalsDo   String            @db.Text
+  whyChoose             String            @db.Text
+  educationSummary      String            @db.Text
+  salaryMinSample       Int?
+  salaryMaxSample       Int?
+  salaryCurrency        String            @default("INR")
+  salaryPeriod          String            @default("per year")
+  salaryDisclaimer      String            @default("Illustrative sample/demo figures only; actual compensation varies by role, employer, location, and experience.") @db.Text
+  demandLevel           DemandLevel       @default(MODERATE)
+  demandDisclaimer      String            @default("Illustrative demo indicator only; demand can change by location, employer, and time.") @db.Text
+  isDemoData            Boolean           @default(true)
+  difficulty            CareerDifficulty  @default(MODERATE)
+  workLifeBalance       Int?
+  growthPotential       Int?
+  governmentOpportunity Int?
+  remoteWorkPotential   Int?
+  entranceExams         String[]
+  certifications        String[]
+  recommendedCourses    String[]
+  careerProgression     Json?
+  relatedCareerSlugs    String[]
+  category              CareerCategory    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  skills                CareerSkill[]
+  interests             CareerInterest[]
+  fitProfile            CareerFitProfile?
+  roadmap               CareerRoadmap?
+  recommendations       Recommendation[]
+  savedBy               SavedCareer[]
+  goals                 CareerGoal[]
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+
+  @@index([categoryId])
+  @@index([demandLevel])
+  @@index([difficulty])
+}
+
+model CareerSkill {
+  careerId     String
+  skillId      String
+  targetLevel  Int
+  importance   Int               @default(50)
+  isTechnical  Boolean           @default(false)
+  notes        String?           @db.Text
+  career       Career            @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  skill        Skill             @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@id([careerId, skillId])
+  @@index([skillId])
+}
+
+model CareerInterest {
+  careerId   String
+  interestId String
+  weight     Int               @default(50)
+  career     Career            @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  interest   Interest          @relation(fields: [interestId], references: [id], onDelete: Cascade)
+
+  @@id([careerId, interestId])
+  @@index([interestId])
+}
+
+model CareerFitProfile {
+  id                     String   @id @default(cuid())
+  careerId               String   @unique
+  interestTargets        Json
+  personalityTargets     Json
+  valueTargets           Json
+  workPreferenceTargets  Json
+  academicProfile        Json
+  career                 Career   @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+}
+
+model AssessmentQuestion {
+  id          String              @id @default(cuid())
+  slug        String              @unique
+  dimension   AssessmentDimension
+  prompt      String              @db.Text
+  helperText  String?             @db.Text
+  options     Json
+  order       Int
+  isActive    Boolean             @default(true)
+  answers     AssessmentAnswer[]
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@index([dimension, order])
+}
+
+model Assessment {
+  id                   String             @id @default(cuid())
+  userId               String
+  status               AssessmentStatus   @default(IN_PROGRESS)
+  progressPercent      Int                @default(0)
+  currentQuestionOrder Int                @default(1)
+  profileSnapshot      Json?
+  summary              Json?
+  startedAt            DateTime           @default(now())
+  completedAt          DateTime?
+  user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  answers              AssessmentAnswer[]
+  recommendations      Recommendation[]
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@index([userId, status])
+  @@index([completedAt])
+}
+
+model AssessmentAnswer {
+  id             String             @id @default(cuid())
+  assessmentId   String
+  questionId     String
+  numericValue   Int?
+  selectedOption String?
+  response       Json?
+  assessment     Assessment         @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  question       AssessmentQuestion @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@unique([assessmentId, questionId])
+  @@index([questionId])
+}
+
+model Recommendation {
+  id                   String     @id @default(cuid())
+  assessmentId         String
+  careerId             String
+  overallScore         Int
+  interestScore        Int
+  skillScore           Int
+  personalityScore     Int
+  academicScore        Int
+  valueScore           Int
+  workPreferenceScore  Int
+  reasons              String[]
+  strengths            String[]
+  skillGaps            String[]
+  nextSteps            String[]
+  assessment           Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  career               Career     @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+
+  @@unique([assessmentId, careerId])
+  @@index([careerId, overallScore])
+}
+
+model SavedCareer {
+  id        String   @id @default(cuid())
+  userId    String
+  careerId  String
+  isPrimary Boolean  @default(false)
+  note      String?  @db.Text
+  savedAt   DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  career    Career   @relation(fields: [careerId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, careerId])
+  @@index([userId, isPrimary])
+}
+
+model CareerRoadmap {
+  id             String          @id @default(cuid())
+  careerId       String          @unique
+  title          String
+  description    String?         @db.Text
+  estimatedWeeks Int?
+  career         Career          @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  phases         RoadmapPhase[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+model RoadmapPhase {
+  id          String           @id @default(cuid())
+  roadmapId   String
+  order       Int
+  title       String
+  description String?          @db.Text
+  roadmap     CareerRoadmap    @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
+  items       RoadmapItem[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@unique([roadmapId, order])
+}
+
+model RoadmapItem {
+  id             String            @id @default(cuid())
+  phaseId        String
+  order          Int
+  title          String
+  description    String?           @db.Text
+  itemType       RoadmapItemType   @default(LEARNING)
+  estimatedHours Int?
+  resourceUrl    String?
+  isOptional     Boolean           @default(false)
+  phase          RoadmapPhase      @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  progress       UserRoadmapProgress[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@unique([phaseId, order])
+}
+
+model UserRoadmapProgress {
+  id            String      @id @default(cuid())
+  userId        String
+  roadmapItemId String
+  isCompleted   Boolean     @default(false)
+  completedAt   DateTime?
+  notes         String?     @db.Text
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roadmapItem   RoadmapItem @relation(fields: [roadmapItemId], references: [id], onDelete: Cascade)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([userId, roadmapItemId])
+  @@index([roadmapItemId])
+}
+
+model CareerGoal {
+  id          String      @id @default(cuid())
+  profileId   String
+  careerId    String?
+  title       String
+  description String?     @db.Text
+  targetDate  DateTime?
+  status      GoalStatus  @default(NOT_STARTED)
+  profile     Profile     @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  career      Career?     @relation(fields: [careerId], references: [id], onDelete: SetNull)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([profileId, status])
+  @@index([careerId])
+}
+
+model CounsellingConversation {
+  id        String               @id @default(cuid())
+  userId    String
+  title     String?
+  context   Json?
+  user      User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  CounsellingMessage[]
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+
+  @@index([userId, updatedAt])
+}
+
+model CounsellingMessage {
+  id             String                  @id @default(cuid())
+  conversationId String
+  role           MessageRole
+  content        String                  @db.Text
+  context        Json?
+  conversation   CounsellingConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime                @default(now())
+
+  @@index([conversationId, createdAt])
+}
