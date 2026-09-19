@@ -23,7 +23,7 @@ import Admin from './pages/Admin'
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
       <AppProvider>
         <Routes>
           {/* ── Public routes ─────────────────────────────────────── */}
