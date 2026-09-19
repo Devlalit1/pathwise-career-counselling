@@ -5,3 +5,5 @@ dist/
 *.tsbuildinfo
 coverage/
 prisma/dev.db
+
+.vercel
