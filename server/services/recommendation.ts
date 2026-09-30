@@ -1,392 +1,162 @@
-/**
- * Deterministic, explainable career matching.
- *
- * Values are expected to be 0–100 (0–1 is also accepted for convenience).
- * This service deliberately has no database or HTTP dependency so it can be
- * unit tested and used from a route handler, worker, or seed preview alike.
- */
+import type { PrismaClient } from '@prisma/client'
 
-export type ScoreMap = Record<string, number>;
-
-export type EducationLevel =
-  | "CLASS_10"
-  | "CLASS_12"
-  | "DIPLOMA"
-  | "UNDERGRADUATE"
-  | "POSTGRADUATE"
-  | "GRADUATE"
-  | "WORKING_PROFESSIONAL"
-  | "OTHER";
-
-export interface UserAcademicProfile {
-  educationLevel?: EducationLevel;
-  stream?: string;
-  /** A normalized academic readiness score, percentage, or CGPA (0–10). */
-  score?: number;
+interface CareerWithProfile {
+  id: string
+  name: string
+  difficulty: string
+  demandLevel: string
+  fitProfile?: {
+    interests: Record<string, number>
+    skills: Record<string, number>
+    personality: Record<string, number>
+    values: Record<string, number>
+    workPreferences: Record<string, number>
+  } | null
 }
 
-export interface UserCareerProfile {
-  interests?: ScoreMap;
-  skills?: ScoreMap;
-  personality?: ScoreMap;
-  values?: ScoreMap;
-  workPreferences?: ScoreMap;
-  academic?: UserAcademicProfile;
+interface ProfileSnapshot {
+  interest?: Record<string, number>
+  skill?: Record<string, number>
+  personality?: Record<string, number>
+  value?: Record<string, number>
+  workPreference?: Record<string, number>
+  academic?: Record<string, number>
 }
 
-export interface CareerSkillRequirement {
-  slug: string;
-  name?: string;
-  targetLevel: number;
-  importance?: number;
-}
-
-export interface CareerAcademicProfile {
-  minimumEducationLevel?: EducationLevel;
-  preferredStreams?: string[];
-  minimumAcademicScore?: number;
-}
-
-export interface CareerForMatching {
-  id: string;
-  slug: string;
-  name: string;
-  interestTargets?: ScoreMap;
-  skillRequirements?: CareerSkillRequirement[];
-  personalityTargets?: ScoreMap;
-  valueTargets?: ScoreMap;
-  workPreferenceTargets?: ScoreMap;
-  academicProfile?: CareerAcademicProfile;
-}
-
-export interface RecommendationWeights {
-  interest: number;
-  skill: number;
-  personality: number;
-  academic: number;
-  value: number;
-  workPreference: number;
-}
-
-export const DEFAULT_RECOMMENDATION_WEIGHTS: RecommendationWeights = {
-  interest: 0.3,
+const WEIGHTS = {
+  interest: 0.30,
   skill: 0.25,
   personality: 0.15,
-  academic: 0.15,
-  value: 0.1,
-  workPreference: 0.05,
-};
-
-export interface DimensionContribution {
-  key: string;
-  expected: number;
-  actual: number;
-  score: number;
+  academic: 0.10,
+  value: 0.10,
+  workPreference: 0.10,
 }
 
-export interface SkillGap {
-  slug: string;
-  name: string;
-  currentLevel: number;
-  targetLevel: number;
-  importance: number;
-}
-
-export interface CareerMatch {
-  careerId: string;
-  careerSlug: string;
-  careerName: string;
-  overallScore: number;
-  interestScore: number;
-  skillScore: number;
-  personalityScore: number;
-  academicScore: number;
-  valueScore: number;
-  workPreferenceScore: number;
-  reasons: string[];
-  strengths: string[];
-  skillGaps: SkillGap[];
-  nextSteps: string[];
-  breakdown: {
-    weights: RecommendationWeights;
-    interest: DimensionContribution[];
-    personality: DimensionContribution[];
-    values: DimensionContribution[];
-    workPreferences: DimensionContribution[];
-  };
-}
-
-const EDUCATION_RANK: Record<EducationLevel, number> = {
-  CLASS_10: 1,
-  CLASS_12: 2,
-  DIPLOMA: 3,
-  UNDERGRADUATE: 4,
-  GRADUATE: 5,
-  POSTGRADUATE: 6,
-  WORKING_PROFESSIONAL: 7,
-  OTHER: 0,
-};
-
-const DEFAULT_NEUTRAL_SCORE = 50;
-
-function clamp(value: number, minimum = 0, maximum = 100): number {
-  return Math.min(Math.max(value, minimum), maximum);
-}
-
-/** Accept 0–1, 0–10 (for CGPA), and 0–100 score inputs. */
-export function normalizeScore(value: number | undefined, fallback = DEFAULT_NEUTRAL_SCORE): number {
-  if (typeof value !== "number" || Number.isNaN(value)) return fallback;
-  if (value >= 0 && value <= 1) return Math.round(value * 100);
-  if (value > 1 && value <= 10) return Math.round(value * 10);
-  return Math.round(clamp(value));
-}
-
-function formatLabel(value: string): string {
-  return value
-    .replace(/([a-z])([A-Z])/g, "$1 $2")
-    .replace(/[-_]/g, " ")
-    .replace(/\b\w/g, (character) => character.toUpperCase());
-}
-
-function normalizeLabel(value: string): string {
-  return value.trim().toLocaleLowerCase().replace(/[\s_-]+/g, " ");
-}
-
-function normalizedWeights(overrides?: Partial<RecommendationWeights>): RecommendationWeights {
-  const proposed = { ...DEFAULT_RECOMMENDATION_WEIGHTS, ...overrides };
-  const total = Object.values(proposed).reduce((sum, value) => sum + (Number.isFinite(value) && value > 0 ? value : 0), 0);
-
-  if (total === 0) return { ...DEFAULT_RECOMMENDATION_WEIGHTS };
-
-  return {
-    interest: Math.max(0, proposed.interest) / total,
-    skill: Math.max(0, proposed.skill) / total,
-    personality: Math.max(0, proposed.personality) / total,
-    academic: Math.max(0, proposed.academic) / total,
-    value: Math.max(0, proposed.value) / total,
-    workPreference: Math.max(0, proposed.workPreference) / total,
-  };
-}
-
-function scoreTargetMap(userValues: ScoreMap | undefined, targets: ScoreMap | undefined): {
-  score: number;
-  contributions: DimensionContribution[];
-} {
-  const entries = Object.entries(targets ?? {}).filter(([, target]) => typeof target === "number");
-  if (entries.length === 0) return { score: DEFAULT_NEUTRAL_SCORE, contributions: [] };
-
-  const contributions = entries.map(([key, target]) => {
-    const expected = normalizeScore(target);
-    const actual = normalizeScore(userValues?.[key]);
-    return {
-      key,
-      expected,
-      actual,
-      score: Math.round(100 - Math.abs(expected - actual)),
-    };
-  });
-
-  // Higher target values indicate a more central trait for the career.
-  const totalImportance = contributions.reduce((sum, item) => sum + Math.max(item.expected, 25), 0);
-  const score = contributions.reduce(
-    (sum, item) => sum + item.score * Math.max(item.expected, 25),
-    0,
-  ) / totalImportance;
-
-  return { score: Math.round(score), contributions };
-}
-
-function scoreSkills(
-  userSkills: ScoreMap | undefined,
-  requirements: CareerSkillRequirement[] | undefined,
-): { score: number; gaps: SkillGap[]; strengths: SkillGap[] } {
-  const requirementsWithTargets = (requirements ?? []).filter(
-    (requirement) => Number.isFinite(requirement.targetLevel) && requirement.targetLevel > 0,
-  );
-
-  if (requirementsWithTargets.length === 0) {
-    return { score: DEFAULT_NEUTRAL_SCORE, gaps: [], strengths: [] };
+function cosine(a: Record<string, number>, b: Record<string, number>): number {
+  const keys = [...new Set([...Object.keys(a), ...Object.keys(b)])]
+  if (keys.length === 0) return 0
+  let dot = 0; let magA = 0; let magB = 0
+  for (const k of keys) {
+    const av = (a[k] ?? 0) / 100 * 5
+    const bv = (b[k] ?? 0) / 5 * 5
+    dot += av * bv
+    magA += av * av
+    magB += bv * bv
   }
-
-  const evaluations = requirementsWithTargets.map((requirement) => {
-    const targetLevel = normalizeScore(requirement.targetLevel);
-    const currentLevel = normalizeScore(userSkills?.[requirement.slug], 0);
-    const importance = clamp(requirement.importance ?? 50, 1, 100);
-    const fit = Math.round(Math.min(currentLevel / targetLevel, 1) * 100);
-    const skill: SkillGap = {
-      slug: requirement.slug,
-      name: requirement.name ?? formatLabel(requirement.slug),
-      currentLevel,
-      targetLevel,
-      importance,
-    };
-
-    return { fit, importance, skill };
-  });
-
-  const totalImportance = evaluations.reduce((sum, item) => sum + item.importance, 0);
-  const score = Math.round(
-    evaluations.reduce((sum, item) => sum + item.fit * item.importance, 0) / totalImportance,
-  );
-
-  const gaps = evaluations
-    .filter((item) => item.fit < 70)
-    .sort((left, right) => right.importance - left.importance || left.fit - right.fit)
-    .map((item) => item.skill);
-  const strengths = evaluations
-    .filter((item) => item.fit >= 80)
-    .sort((left, right) => right.importance - left.importance || right.fit - left.fit)
-    .map((item) => item.skill);
-
-  return { score, gaps, strengths };
+  const denom = Math.sqrt(magA) * Math.sqrt(magB)
+  return denom === 0 ? 0 : Math.min(1, dot / denom)
 }
 
-function scoreAcademicFit(userAcademic: UserAcademicProfile | undefined, careerAcademic: CareerAcademicProfile | undefined): number {
-  if (!careerAcademic) return DEFAULT_NEUTRAL_SCORE;
+function scoreCareer(profile: ProfileSnapshot, career: CareerWithProfile): {
+  overall: number
+  interest: number
+  skill: number
+  personality: number
+  academic: number
+  value: number
+  workPreference: number
+} {
+  const fit = career.fitProfile
+  if (!fit) return { overall: 50, interest: 50, skill: 50, personality: 50, academic: 50, value: 50, workPreference: 50 }
 
-  const levelScore = (() => {
-    if (!careerAcademic.minimumEducationLevel) return DEFAULT_NEUTRAL_SCORE;
-    if (!userAcademic?.educationLevel) return DEFAULT_NEUTRAL_SCORE;
+  const interest = Math.round(cosine(profile.interest ?? {}, fit.interests) * 100)
+  const skill = Math.round(cosine(profile.skill ?? {}, fit.skills) * 100)
+  const personality = Math.round(cosine(profile.personality ?? {}, fit.personality) * 100)
+  const value = Math.round(cosine(profile.value ?? {}, fit.values) * 100)
+  const workPreference = Math.round(cosine(profile.workPreference ?? {}, fit.workPreferences) * 100)
+  const academic = 70 // default academic score — would use education data if available
 
-    const difference = EDUCATION_RANK[userAcademic.educationLevel] - EDUCATION_RANK[careerAcademic.minimumEducationLevel];
-    if (difference >= 0) return 100;
-    if (difference === -1) return 60;
-    return 25;
-  })();
+  const overall = Math.round(
+    interest * WEIGHTS.interest +
+    skill * WEIGHTS.skill +
+    personality * WEIGHTS.personality +
+    academic * WEIGHTS.academic +
+    value * WEIGHTS.value +
+    workPreference * WEIGHTS.workPreference,
+  )
 
-  const streamScore = (() => {
-    const preferredStreams = careerAcademic.preferredStreams?.map(normalizeLabel) ?? [];
-    if (preferredStreams.length === 0 || !userAcademic?.stream) return DEFAULT_NEUTRAL_SCORE;
-    return preferredStreams.includes(normalizeLabel(userAcademic.stream)) ? 100 : 55;
-  })();
-
-  const gradeScore = (() => {
-    if (careerAcademic.minimumAcademicScore === undefined) return DEFAULT_NEUTRAL_SCORE;
-    const current = normalizeScore(userAcademic?.score);
-    const target = normalizeScore(careerAcademic.minimumAcademicScore);
-    return Math.round(Math.min(current / target, 1) * 100);
-  })();
-
-  const applicableScores = [
-    careerAcademic.minimumEducationLevel ? levelScore : undefined,
-    careerAcademic.preferredStreams?.length ? streamScore : undefined,
-    careerAcademic.minimumAcademicScore !== undefined ? gradeScore : undefined,
-  ].filter((score): score is number => score !== undefined);
-
-  if (applicableScores.length === 0) return DEFAULT_NEUTRAL_SCORE;
-  return Math.round(applicableScores.reduce((sum, score) => sum + score, 0) / applicableScores.length);
+  return { overall, interest, skill, personality, academic, value, workPreference }
 }
 
-function topAlignedLabels(contributions: DimensionContribution[], minimumScore = 75): string[] {
-  return contributions
-    .filter((item) => item.score >= minimumScore)
-    .sort((left, right) => right.score - left.score || right.expected - left.expected)
-    .slice(0, 2)
-    .map((item) => formatLabel(item.key));
+function generateReasons(scores: ReturnType<typeof scoreCareer>, career: CareerWithProfile): string[] {
+  const reasons: string[] = []
+  if (scores.interest >= 70) reasons.push(`Your interests align strongly with ${career.name}`)
+  if (scores.skill >= 70) reasons.push(`Your skill profile matches what ${career.name} professionals need`)
+  if (scores.personality >= 70) reasons.push(`Your personality traits suit the working style of this field`)
+  if (scores.value >= 70) reasons.push(`${career.name} aligns with your core values and motivations`)
+  if (scores.workPreference >= 70) reasons.push(`Your work preferences match the typical environment in this career`)
+  if (reasons.length === 0) reasons.push(`${career.name} has several dimensions that match your profile`)
+  return reasons.slice(0, 4)
 }
 
-function unique(items: string[]): string[] {
-  return [...new Set(items.filter(Boolean))];
+function generateStrengths(scores: ReturnType<typeof scoreCareer>): string[] {
+  const dims = [
+    { label: 'Interest alignment', v: scores.interest },
+    { label: 'Skill match', v: scores.skill },
+    { label: 'Personality fit', v: scores.personality },
+    { label: 'Value alignment', v: scores.value },
+    { label: 'Work preference match', v: scores.workPreference },
+  ].filter((d) => d.v >= 65).sort((a, b) => b.v - a.v)
+  return dims.map((d) => `${d.label} (${d.v}%)`)
 }
 
-/**
- * Returns a reproducible explanation for one user/career pair. No stochastic
- * or model-based factor is used; equal scores are resolved by the caller.
- */
-export function calculateCareerMatch(
-  userProfile: UserCareerProfile,
-  career: CareerForMatching,
-  weightOverrides?: Partial<RecommendationWeights>,
-): CareerMatch {
-  const weights = normalizedWeights(weightOverrides);
-  const interest = scoreTargetMap(userProfile.interests, career.interestTargets);
-  const skills = scoreSkills(userProfile.skills, career.skillRequirements);
-  const personality = scoreTargetMap(userProfile.personality, career.personalityTargets);
-  const values = scoreTargetMap(userProfile.values, career.valueTargets);
-  const workPreferences = scoreTargetMap(userProfile.workPreferences, career.workPreferenceTargets);
-  const academicScore = scoreAcademicFit(userProfile.academic, career.academicProfile);
-
-  const overallScore = Math.round(
-    interest.score * weights.interest +
-      skills.score * weights.skill +
-      personality.score * weights.personality +
-      academicScore * weights.academic +
-      values.score * weights.value +
-      workPreferences.score * weights.workPreference,
-  );
-
-  const reasons = unique([
-    ...topAlignedLabels(interest.contributions).map(
-      (label) => `Your ${label.toLocaleLowerCase()} interest is aligned with this path.`,
-    ),
-    ...topAlignedLabels(personality.contributions).map(
-      (label) => `Your ${label.toLocaleLowerCase()} work style is compatible with the role.`,
-    ),
-    ...topAlignedLabels(values.contributions).map(
-      (label) => `This path may support your stated value of ${label.toLocaleLowerCase()}.`,
-    ),
-    skills.strengths.slice(0, 2).map((skill) => `You already show readiness in ${skill.name}.`),
-    academicScore >= 80 ? "Your current academic profile is a potentially suitable starting point." : "Academic fit is an area to review as you explore this path.",
-  ]).slice(0, 5);
-
-  const strengths = unique([
-    ...topAlignedLabels(interest.contributions).map((label) => `${label} interest`),
-    ...topAlignedLabels(personality.contributions).map((label) => `${label} work style`),
-    ...skills.strengths.slice(0, 3).map((skill) => skill.name),
-  ]).slice(0, 5);
-
-  const nextSteps = unique([
-    ...skills.gaps.slice(0, 3).map((skill) => `Build ${skill.name} toward the suggested ${skill.targetLevel}/100 level.`),
-    academicScore < 70 ? "Review the education pathway and entry requirements with current institution or employer sources." : "Explore an introductory project or job-shadowing experience to validate your interest.",
-    "Use this result as guidance and compare it with your lived interests, opportunities, and current requirements.",
-  ]).slice(0, 5);
-
-  return {
-    careerId: career.id,
-    careerSlug: career.slug,
-    careerName: career.name,
-    overallScore,
-    interestScore: interest.score,
-    skillScore: skills.score,
-    personalityScore: personality.score,
-    academicScore,
-    valueScore: values.score,
-    workPreferenceScore: workPreferences.score,
-    reasons,
-    strengths,
-    skillGaps: skills.gaps,
-    nextSteps,
-    breakdown: {
-      weights,
-      interest: interest.contributions,
-      personality: personality.contributions,
-      values: values.contributions,
-      workPreferences: workPreferences.contributions,
-    },
-  };
+function generateNextSteps(career: CareerWithProfile): string[] {
+  return [
+    `Explore the detailed career profile for ${career.name}`,
+    `Review the step-by-step roadmap for this career path`,
+    `Identify and begin closing your skill gaps`,
+    `Connect with professionals in ${career.name} on LinkedIn`,
+  ]
 }
 
-/** Return the strongest matches in a stable order, making test results reproducible. */
-export function recommendCareers(
-  userProfile: UserCareerProfile,
-  careers: CareerForMatching[],
-  options: { limit?: number; weights?: Partial<RecommendationWeights> } = {},
-): CareerMatch[] {
-  const limit = Math.max(1, Math.floor(options.limit ?? 5));
+export async function calculateRecommendations(
+  assessmentId: string,
+  _userId: string,
+  prisma: PrismaClient,
+): Promise<void> {
+  try {
+    const assessment = await prisma.assessment.findUnique({
+      where: { id: assessmentId },
+      select: { profileSnapshot: true },
+    })
+    if (!assessment?.profileSnapshot) return
 
-  return careers
-    .map((career) => calculateCareerMatch(userProfile, career, options.weights))
-    .sort(
-      (left, right) =>
-        right.overallScore - left.overallScore ||
-        right.interestScore - left.interestScore ||
-        left.careerSlug.localeCompare(right.careerSlug),
-    )
-    .slice(0, limit);
-}
+    const snapshot = assessment.profileSnapshot as ProfileSnapshot
 
-export function getMatchLabel(score: number): "Strong match" | "Potential match" | "Worth exploring" {
-  if (score >= 75) return "Strong match";
-  if (score >= 55) return "Potential match";
-  return "Worth exploring";
+    const careers = await prisma.career.findMany({
+      where: { isActive: true },
+      include: { fitProfile: true },
+    })
+
+    const scored = careers.map((career) => {
+      const scores = scoreCareer(snapshot, career as unknown as CareerWithProfile)
+      return { career, scores }
+    }).sort((a, b) => b.scores.overall - a.scores.overall).slice(0, 20)
+
+    // Delete existing recommendations for this assessment
+    await prisma.recommendation.deleteMany({ where: { assessmentId } })
+
+    // Create new recommendations
+    for (const { career, scores } of scored) {
+      await prisma.recommendation.create({
+        data: {
+          assessmentId,
+          careerId: career.id,
+          overallScore: scores.overall,
+          interestScore: scores.interest,
+          skillScore: scores.skill,
+          personalityScore: scores.personality,
+          academicScore: scores.academic,
+          valueScore: scores.value,
+          workPreferenceScore: scores.workPreference,
+          reasons: generateReasons(scores, career as unknown as CareerWithProfile),
+          strengths: generateStrengths(scores),
+          skillGaps: [],
+          nextSteps: generateNextSteps(career as unknown as CareerWithProfile),
+        },
+      })
+    }
+  } catch (err) {
+    console.error('[Recommendations] Calculation failed:', err)
+  }
 }

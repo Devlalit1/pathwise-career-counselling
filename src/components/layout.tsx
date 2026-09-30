@@ -11,12 +11,15 @@ import {
   Menu,
   MessageCircleHeart,
   Route,
+  Settings,
   ShieldCheck,
+  Target,
   X,
 } from 'lucide-react'
 import { Link, NavLink, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { Button, cn, Tag } from './ui'
+
 
 export function Brand() {
   return (
@@ -108,16 +111,19 @@ const navigation = [
   { to: '/compare', label: 'Compare careers', icon: BarChart3 },
   { to: '/my-plan', label: 'My career plan', icon: Route },
   { to: '/counsellor', label: 'Career counsellor', icon: MessageCircleHeart },
+  { to: '/goals', label: 'My goals', icon: Target },
 ]
 
 function titleForPath(pathname: string) {
   const current = navigation.find((item) => pathname === item.to || pathname.startsWith(`${item.to}/`))
   if (pathname === '/profile') return 'Profile'
   if (pathname === '/assessment-history') return 'Assessment history'
+  if (pathname === '/settings') return 'Settings'
   if (pathname.startsWith('/admin')) return 'Administration'
   if (pathname === '/onboarding') return 'Your profile'
   return current?.label ?? 'Pathwise'
 }
+
 
 function Avatar({ name, small = false }: { name: string; small?: boolean }) {
   const initials = name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase()

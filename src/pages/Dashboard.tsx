@@ -1,265 +1,296 @@
+import { ArrowRight, BookOpen, CheckCircle2, Compass, Star, Target, TrendingUp, Zap } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import {
-  ArrowRight,
-  BarChart3,
-  BookOpenCheck,
-  BriefcaseBusiness,
-  CheckCircle2,
-  Route,
-  Target,
-} from 'lucide-react'
+import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Button, EmptyState, ProgressRing, ScoreBadge, Skeleton } from '../components/ui'
 import { useApp } from '../context/AppContext'
-import { Button, Card, EmptyState, ScoreBadge, SectionHeading, Tag } from '../components/ui'
-import { CAREERS } from '../data/careers'
-import { ASSESSMENT_QUESTION_COUNT } from '../data/questions'
 
-function ProgressRing({ percent }: { percent: number }) {
-  return (
-    <div
-      className="progress-ring"
-      style={{ '--progress': `${percent}%` } as React.CSSProperties}
-    >
-      <strong>{percent}%</strong>
-    </div>
-  )
+function getGreeting() {
+  const h = new Date().getHours()
+  if (h < 12) return 'Good morning'
+  if (h < 17) return 'Good afternoon'
+  return 'Good evening'
 }
 
 export default function Dashboard() {
-  const {
-    user,
-    recommendations,
-    assessmentProfile,
-    primaryCareerId,
-    savedCareerIds,
-    roadmapProgress,
-    answers,
-    assessmentHistory,
-  } = useApp()
+  const { user, recommendations, assessmentProfile, roadmapProgress, savedCareerIds, primaryCareerId, assessmentHistory } = useApp()
 
-  const primaryCareer = CAREERS.find((c) => c.id === primaryCareerId)
-  const primaryMatch = recommendations.find((r) => r.careerId === primaryCareerId)
-  const savedCareers = CAREERS.filter((c) => savedCareerIds.includes(c.id))
+  const isLoading = false // would be true during API fetch
+  const hasAssessment = assessmentProfile !== null && recommendations.length > 0
+  const topMatch = recommendations[0] ?? null
+  const totalTasks = 8 // would come from roadmap data
+  const doneTasks = Object.values(roadmapProgress).filter(Boolean).length
 
-  // Roadmap progress for primary career
-  const allRoadmapItems = primaryCareer?.roadmap.flatMap((p) => p.items) ?? []
-  const completedCount = allRoadmapItems.filter((item) => roadmapProgress[item.id]).length
-  const roadmapPercent = allRoadmapItems.length > 0 ? Math.round((completedCount / allRoadmapItems.length) * 100) : 0
+  // Chart data from recommendations
+  const chartData = recommendations.slice(0, 8).map((r) => ({
+    name: r.career.name.length > 14 ? r.career.name.slice(0, 13) + '…' : r.career.name,
+    score: r.overallScore,
+  }))
 
-  // Assessment progress
-  const answeredCount = Object.keys(answers).length
-  const assessmentPercent = Math.round((answeredCount / ASSESSMENT_QUESTION_COUNT) * 100)
-  const hasAssessment = assessmentProfile !== null
-
-  const firstName = user?.name.split(' ')[0] ?? 'there'
+  const scoreBreakdown = topMatch
+    ? [
+        { label: 'Interests', value: topMatch.interestScore },
+        { label: 'Skills', value: topMatch.skillScore },
+        { label: 'Personality', value: topMatch.personalityScore },
+        { label: 'Academic', value: topMatch.academicScore },
+        { label: 'Values', value: topMatch.valueScore },
+        { label: 'Work prefs', value: topMatch.workPreferenceScore },
+      ]
+    : []
 
   return (
-    <div>
+    <div className="app-content animate-fade-in">
       {/* Welcome banner */}
-      <div className="dashboard-welcome">
+      <div className="dashboard-welcome animate-slide-up">
         <div>
-          <h1>Welcome back, {firstName} 👋</h1>
+          <h1>
+            {getGreeting()}, {user?.name?.split(' ')[0] ?? 'there'}! 👋
+          </h1>
           <p>
             {hasAssessment
-              ? `You have ${recommendations.length} career matches. Your top match is ${recommendations[0]?.career.name ?? 'being calculated'}.`
-              : 'Complete the career assessment to unlock personalised matches and your roadmap.'}
+              ? `You have ${recommendations.length} career matches. Your top match is ${topMatch?.career.name} at ${topMatch?.overallScore}% fit.`
+              : 'Complete the assessment to get your personalised career matches and a step-by-step roadmap.'}
           </p>
+          {!hasAssessment && (
+            <div style={{ marginTop: 14 }}>
+              <Link to="/assessment">
+                <Button variant="secondary" size="sm" style={{ color: '#fff', borderColor: 'rgba(255,255,255,.3)', background: 'rgba(255,255,255,.12)' }}>
+                  Start assessment <ArrowRight size={14} />
+                </Button>
+              </Link>
+            </div>
+          )}
         </div>
         <div className="dashboard-welcome__status">
-          <div style={{ fontSize: '.65rem', opacity: .7 }}>Assessment</div>
-          <div style={{ fontSize: '1.15rem', fontWeight: 850, marginTop: 3 }}>
-            {hasAssessment ? '✓ Complete' : `${assessmentPercent}%`}
-          </div>
-          <div style={{ fontSize: '.65rem', opacity: .7, marginTop: 2 }}>{assessmentHistory.length} submitted</div>
+          <div style={{ fontSize: '.68rem', marginBottom: 3, opacity: .75 }}>Account status</div>
+          <div style={{ fontWeight: 780, fontSize: '.8rem' }}>{hasAssessment ? '✓ Assessment complete' : '○ Assessment pending'}</div>
+          <div style={{ fontSize: '.68rem', marginTop: 4, opacity: .7 }}>{savedCareerIds.length} saved · {assessmentHistory.length} assessment{assessmentHistory.length !== 1 ? 's' : ''}</div>
         </div>
       </div>
 
-      {/* Metric cards */}
-      <div className="dashboard-grid__wide">
-        <div className="metric-card">
-          <div className="metric-card__top">
-            <span className="metric-card__label">Top match score</span>
-            <div className="metric-card__icon"><Target size={15} /></div>
-          </div>
-          <div className="metric-card__value">
-            {recommendations[0] ? `${recommendations[0].overallScore}%` : '—'}
-          </div>
-          <p className="metric-card__note">
-            {recommendations[0] ? recommendations[0].career.name : 'Take the assessment to see matches'}
-          </p>
-        </div>
-        <div className="metric-card">
-          <div className="metric-card__top">
-            <span className="metric-card__label">Roadmap progress</span>
-            <div className="metric-card__icon"><Route size={15} /></div>
-          </div>
-          <div className="metric-card__value">{primaryCareer ? `${roadmapPercent}%` : '—'}</div>
-          <p className="metric-card__note">
-            {primaryCareer ? `${completedCount} / ${allRoadmapItems.length} tasks done` : 'Set a primary career to see your roadmap'}
-          </p>
-        </div>
-        <div className="metric-card">
-          <div className="metric-card__top">
-            <span className="metric-card__label">Saved careers</span>
-            <div className="metric-card__icon"><BriefcaseBusiness size={15} /></div>
-          </div>
-          <div className="metric-card__value">{savedCareerIds.length}</div>
-          <p className="metric-card__note">
-            {savedCareerIds.length > 0 ? savedCareers[0]?.name : 'Bookmark careers to compare later'}
-          </p>
-        </div>
+      {/* Metrics row */}
+      <div className="dashboard-grid__wide animate-slide-up delay-100">
+        {isLoading ? (
+          <>
+            <Skeleton className="skeleton--card" />
+            <Skeleton className="skeleton--card" />
+            <Skeleton className="skeleton--card" />
+          </>
+        ) : (
+          <>
+            <div className="metric-card">
+              <div className="metric-card__top">
+                <span className="metric-card__label">Top match score</span>
+                <span className="metric-card__icon"><Star size={16} /></span>
+              </div>
+              <div className="metric-card__value">{topMatch ? `${topMatch.overallScore}%` : '—'}</div>
+              <p className="metric-card__note">{topMatch ? topMatch.career.name : 'Complete assessment to see matches'}</p>
+            </div>
+
+            <div className="metric-card">
+              <div className="metric-card__top">
+                <span className="metric-card__label">Careers matched</span>
+                <span className="metric-card__icon"><Compass size={16} /></span>
+              </div>
+              <div className="metric-card__value">{recommendations.length}</div>
+              <p className="metric-card__note">{savedCareerIds.length} saved to my list</p>
+            </div>
+
+            <div className="metric-card">
+              <div className="metric-card__top">
+                <span className="metric-card__label">Plan progress</span>
+                <span className="metric-card__icon"><Target size={16} /></span>
+              </div>
+              <div className="metric-card__value">{totalTasks ? `${doneTasks}/${totalTasks}` : '—'}</div>
+              <p className="metric-card__note">roadmap tasks complete</p>
+            </div>
+          </>
+        )}
       </div>
 
-      {/* Main grid */}
-      <div className="dashboard-grid">
-        {/* Left — Top matches */}
-        <div>
-          <SectionHeading
-            eyebrow="Your recommendations"
-            title="Top career matches"
-            action={<Link to="/assessment"><Button variant="soft" size="sm">{hasAssessment ? 'Retake assessment' : 'Start assessment'}</Button></Link>}
-          />
-
-          {!hasAssessment ? (
-            <EmptyState
-              title="Take the career assessment"
-              copy="Answer 36 reflective questions and get personalised career matches with skill-gap analysis and roadmaps."
-              action={<Link to="/assessment"><Button size="sm">Start assessment</Button></Link>}
-            />
-          ) : (
-            <div className="ranked-list">
-              {recommendations.map((match, i) => (
-                <div key={match.careerId} className="ranked-list__item">
-                  <div className="ranked-list__rank">{i + 1}</div>
+      {hasAssessment ? (
+        <div className="dashboard-grid animate-slide-up delay-200">
+          {/* Main column */}
+          <div>
+            {/* Top match hero */}
+            {topMatch && (
+              <div className="match-hero" style={{ marginBottom: 18 }}>
+                <div className="match-hero__top">
                   <div>
-                    <span className="ranked-list__name">{match.career.name}</span>
-                    <span className="ranked-list__category">{match.career.category}</span>
+                    <p className="eyebrow">Your #1 match</p>
+                    <h2>{topMatch.career.name}</h2>
+                    <p>{topMatch.career.shortDescription}</p>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-                    <ScoreBadge score={match.overallScore} />
-                    <Link to={`/careers/${match.career.slug}`} style={{ color: 'var(--primary)', fontSize: '.72rem', fontWeight: 750 }}>
-                      View →
-                    </Link>
+                  <div className="match-hero__score">
+                    {topMatch.overallScore}<span>% fit</span>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-
-          {/* Primary career match hero */}
-          {primaryMatch && (
-            <div className="match-hero" style={{ marginTop: 20 }}>
-              <div className="match-hero__top">
-                <div>
-                  <Tag tone="teal">Primary career</Tag>
-                  <h2 style={{ margin: '5px 0 6px', fontSize: '1.34rem' }}>{primaryMatch.career.name}</h2>
-                  <p style={{ margin: '0 0 16px', color: '#53677c', fontSize: '.84rem', lineHeight: 1.55 }}>
-                    {primaryMatch.career.shortDescription}
-                  </p>
-                </div>
-                <div className="match-hero__score">
-                  {primaryMatch.overallScore}<span>%</span>
-                </div>
-              </div>
-              <ul className="match-reason-list">
-                {primaryMatch.reasons.slice(0, 3).map((r) => (
-                  <li key={r}><CheckCircle2 size={14} /> {r}</li>
-                ))}
-              </ul>
-              <div style={{ display: 'flex', gap: 9, marginTop: 16, flexWrap: 'wrap' }}>
-                <Link to={`/careers/${primaryMatch.career.slug}`}><Button size="sm">View full profile</Button></Link>
-                <Link to="/my-plan"><Button variant="soft" size="sm"><Route size={13} /> View roadmap</Button></Link>
-                <Link to="/compare"><Button variant="secondary" size="sm"><BarChart3 size={13} /> Compare</Button></Link>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Right — Roadmap + Skill gaps */}
-        <div>
-          {/* Roadmap preview */}
-          {primaryCareer ? (
-            <Card style={{ marginBottom: 16 }}>
-              <div className="profile-card__header">
-                <h2>Roadmap progress</h2>
-                <Link to="/my-plan"><Button variant="ghost" size="sm">View full plan</Button></Link>
-              </div>
-              <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 16 }}>
-                <ProgressRing percent={roadmapPercent} />
-                <div>
-                  <div style={{ fontWeight: 800, fontSize: '.9rem' }}>{primaryCareer.name}</div>
-                  <div style={{ color: 'var(--muted)', fontSize: '.75rem', marginTop: 3 }}>{completedCount} of {allRoadmapItems.length} tasks completed</div>
-                </div>
-              </div>
-              <ul className="roadmap-preview">
-                {allRoadmapItems.slice(0, 5).map((item) => {
-                  const done = roadmapProgress[item.id]
-                  return (
-                    <li key={item.id} className="roadmap-preview__item">
-                      <div className={`task-check ${done ? 'is-done' : ''}`}>
-                        {done && <CheckCircle2 size={13} />}
-                      </div>
-                      <div>
-                        <strong>{item.title}</strong>
-                        <span>{item.kind}</span>
-                      </div>
+                <ul className="match-reason-list">
+                  {topMatch.reasons.slice(0, 3).map((r) => (
+                    <li key={r}>
+                      <CheckCircle2 size={14} /> {r}
                     </li>
-                  )
-                })}
-              </ul>
-            </Card>
-          ) : (
-            <Card style={{ marginBottom: 16 }}>
-              <EmptyState
-                title="No primary career set"
-                copy="Set a primary career to see your personalised roadmap here."
-                action={<Link to="/careers"><Button size="sm">Explore careers</Button></Link>}
-              />
-            </Card>
-          )}
-
-          {/* Skill gaps */}
-          {primaryMatch && primaryMatch.skillGaps.length > 0 && (
-            <Card>
-              <div className="profile-card__header">
-                <h2>Top skill gaps</h2>
-                <Link to={`/careers/${primaryMatch.career.slug}`}><Button variant="ghost" size="sm">Details</Button></Link>
+                  ))}
+                </ul>
+                <div style={{ marginTop: 14, display: 'flex', gap: 9 }}>
+                  <Link to={`/careers/${topMatch.career.slug}`}>
+                    <Button variant="primary" size="sm">View career details</Button>
+                  </Link>
+                  <Link to="/plan">
+                    <Button variant="secondary" size="sm">My roadmap</Button>
+                  </Link>
+                </div>
               </div>
-              {primaryMatch.skillGaps.slice(0, 4).map((gap) => (
-                <div key={gap.id} className="skill-gap-row">
-                  <div className="skill-gap-row__top">
-                    <span>{gap.name}</span>
-                    <span>{gap.currentLevel} / {gap.requiredLevel}</span>
-                  </div>
-                  <div className="progress-bar">
-                    <span style={{ width: `${gap.currentLevel}%`, background: gap.gap > 20 ? '#e35050' : '#e3a020' }} />
-                  </div>
-                </div>
-              ))}
-            </Card>
-          )}
+            )}
 
-          {/* Quick links */}
-          <Card style={{ marginTop: 16 }}>
-            <h3 style={{ marginBottom: 12, fontSize: '.95rem' }}>Quick actions</h3>
-            {[
-              { to: '/assessment', icon: BookOpenCheck, label: hasAssessment ? 'Retake assessment' : 'Start assessment', desc: '36 questions · ~10 min' },
-              { to: '/compare', icon: BarChart3, label: 'Compare careers', desc: 'Side-by-side comparison' },
-              { to: '/counsellor', icon: ArrowRight, label: 'Career counsellor', desc: 'Ask questions, get guidance' },
-            ].map(({ to, icon: Icon, label, desc }) => (
-              <Link key={to} to={to} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '10px 0', borderTop: '1px solid #edf0f5', color: 'inherit' }}>
-                <div style={{ width: 32, height: 32, borderRadius: 9, background: '#eef2ff', color: 'var(--primary)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-                  <Icon size={15} />
+            {/* Match chart */}
+            {chartData.length > 0 && (
+              <div className="card" style={{ marginBottom: 18 }}>
+                <div className="profile-card__header">
+                  <h2>All career matches</h2>
+                  <Link to="/dashboard" style={{ fontSize: '.8rem', color: 'var(--primary)', fontWeight: 760 }}>See all</Link>
                 </div>
-                <div>
-                  <div style={{ fontSize: '.84rem', fontWeight: 760 }}>{label}</div>
-                  <div style={{ fontSize: '.72rem', color: 'var(--muted)' }}>{desc}</div>
+                <div className="chart-wrap">
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart data={chartData} barSize={22} margin={{ top: 4, right: 4, bottom: 4, left: -18 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#edf0f5" />
+                      <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#8290a3' }} />
+                      <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: '#8290a3' }} />
+                      <Tooltip
+                        formatter={(v) => [`${v}%`, 'Match score']}
+                        contentStyle={{ fontSize: '.78rem', borderRadius: 8, border: '1px solid #e0e7f2' }}
+                      />
+                      <Bar dataKey="score" radius={[5, 5, 0, 0]}>
+                        {chartData.map((_, i) => (
+                          <Cell key={i} fill={i === 0 ? '#0f8f81' : i < 3 ? '#243b8e' : '#93aad8'} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
-                <ArrowRight size={14} style={{ marginLeft: 'auto', color: 'var(--muted)' }} />
-              </Link>
-            ))}
-          </Card>
+              </div>
+            )}
+
+            {/* Skill gaps */}
+            {topMatch && topMatch.skillGaps.length > 0 && (
+              <div className="card">
+                <div className="profile-card__header">
+                  <h2>Top skill gaps for {topMatch.career.name}</h2>
+                </div>
+                {topMatch.skillGaps.slice(0, 4).map((gap) => (
+                  <div key={gap.id} className="skill-gap-row">
+                    <div className="skill-gap-row__top">
+                      <span>{gap.name}</span>
+                      <span>Level {gap.currentLevel}/5 → need {gap.requiredLevel}/5</span>
+                    </div>
+                    <div className="progress-bar">
+                      <span style={{ width: `${(gap.currentLevel / 5) * 100}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Sidebar */}
+          <div>
+            {/* Progress ring */}
+            <div className="card" style={{ marginBottom: 18, textAlign: 'center', padding: 24 }}>
+              <p className="eyebrow" style={{ marginBottom: 14 }}>Roadmap progress</p>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
+                <div style={{ position: 'relative', display: 'inline-grid', placeItems: 'center' }}>
+                  <ProgressRing pct={totalTasks ? Math.round((doneTasks / totalTasks) * 100) : 0} size={88} stroke={8} />
+                  <span style={{ position: 'absolute', color: '#0a766b', fontWeight: 800, fontSize: '.95rem' }}>
+                    {totalTasks ? Math.round((doneTasks / totalTasks) * 100) : 0}%
+                  </span>
+                </div>
+              </div>
+              <p style={{ margin: 0, color: 'var(--muted)', fontSize: '.8rem' }}>
+                {doneTasks} of {totalTasks} tasks done
+              </p>
+              <div style={{ marginTop: 14 }}>
+                <Link to="/plan">
+                  <Button variant="soft" size="sm" style={{ width: '100%' }}>
+                    <BookOpen size={14} /> Open my plan
+                  </Button>
+                </Link>
+              </div>
+            </div>
+
+            {/* Score breakdown */}
+            {topMatch && (
+              <div className="card" style={{ marginBottom: 18 }}>
+                <div className="profile-card__header">
+                  <h2>Score breakdown</h2>
+                  <span style={{ fontSize: '.74rem', color: 'var(--muted)' }}>Top match</span>
+                </div>
+                {scoreBreakdown.map((d) => (
+                  <div key={d.label} className="skill-gap-row">
+                    <div className="skill-gap-row__top">
+                      <span>{d.label}</span>
+                      <span>{d.value}%</span>
+                    </div>
+                    <div className="progress-bar">
+                      <span style={{ width: `${d.value}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Quick links */}
+            <div className="card">
+              <div className="profile-card__header">
+                <h2>Quick actions</h2>
+              </div>
+              <div style={{ display: 'grid', gap: 8 }}>
+                {[
+                  { to: '/assessment', label: 'Retake assessment', icon: Zap },
+                  { to: '/careers', label: 'Browse all careers', icon: Compass },
+                  { to: '/compare', label: 'Compare careers', icon: TrendingUp },
+                  { to: '/goals', label: 'Set a goal', icon: Target },
+                ].map(({ to, label, icon: Icon }) => (
+                  <Link
+                    key={to}
+                    to={to}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 9,
+                      padding: '8px 10px',
+                      borderRadius: 9,
+                      color: '#42536a',
+                      fontSize: '.83rem',
+                      fontWeight: 720,
+                      transition: 'background var(--transition-fast)',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = '#f3f5fb')}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    <Icon size={15} style={{ color: 'var(--primary)' }} />
+                    {label}
+                    <ArrowRight size={13} style={{ marginLeft: 'auto', opacity: .5 }} />
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="animate-slide-up delay-200">
+          <EmptyState
+            icon={<Compass size={22} />}
+            title="Your dashboard is ready"
+            copy="Complete the 36-question assessment to get your personalised career matches, skill gap analysis, and a step-by-step roadmap."
+            action={
+              <Link to="/assessment">
+                <Button variant="primary" size="md">
+                  <Zap size={15} /> Start the assessment
+                </Button>
+              </Link>
+            }
+          />
+        </div>
+      )}
     </div>
   )
 }

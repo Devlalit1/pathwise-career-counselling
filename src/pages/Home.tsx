@@ -1,40 +1,46 @@
 import {
-  BookOpenCheck,
+  ArrowRight,
+  BarChart3,
+  BookOpen,
   BriefcaseBusiness,
   CheckCircle2,
   Compass,
   GraduationCap,
   LineChart,
   MessageCircleHeart,
+  Scale,
   ShieldCheck,
   Sparkles,
   Target,
+  Users,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { CAREERS } from '../data/careers'
-import { Button, Tag } from '../components/ui'
+import { Button, ScoreBadge, SectionHeading } from '../components/ui'
 import { useApp } from '../context/AppContext'
+
+// ── Data ────────────────────────────────────────────────────────────────────
 
 const CATEGORY_ICONS: Record<string, typeof Compass> = {
   Technology: Sparkles,
   'Data & AI': LineChart,
   Engineering: Target,
   Healthcare: ShieldCheck,
-  Finance: LineChart,
+  Finance: BarChart3,
   Management: BriefcaseBusiness,
-  Law: BookOpenCheck,
+  Law: Scale,
   Design: Compass,
   Education: GraduationCap,
-  Research: BookOpenCheck,
+  Research: BookOpen,
   Media: MessageCircleHeart,
   Entrepreneurship: Target,
   'Government & Public Administration': ShieldCheck,
 }
 
 const CATEGORY_COUNTS = (() => {
-  const counts: Record<string, number> = {}
-  for (const c of CAREERS) counts[c.category] = (counts[c.category] ?? 0) + 1
-  return counts
+  const c: Record<string, number> = {}
+  for (const career of CAREERS) c[career.category] = (c[career.category] ?? 0) + 1
+  return c
 })()
 
 const TOP_CATEGORIES = Object.entries(CATEGORY_COUNTS)
@@ -45,130 +51,183 @@ const STEPS = [
   {
     number: '01',
     title: 'Complete the assessment',
-    body: 'Answer 36 reflective questions about your interests, skills, personality, values, and work preferences. It takes about 8–10 minutes.',
+    body: 'Answer 36 reflective questions across 6 dimensions — interests, skills, personality, values, work preferences, and academics. Takes 8–10 minutes.',
   },
   {
     number: '02',
-    title: 'Receive your matches',
-    body: 'Our scoring engine compares your profile across multiple dimensions and ranks careers by overall fit — with transparent, explainable scores.',
+    title: 'Get transparent matches',
+    body: "Our scoring engine ranks every career by overall fit with a detailed breakdown. You'll see exactly why a career was recommended.",
   },
   {
     number: '03',
-    title: 'Explore and plan',
-    body: 'Dive into detailed career profiles, compare pathways side-by-side, and build a personalised roadmap for your chosen direction.',
+    title: 'Build your roadmap',
+    body: 'Dive into detailed career profiles, compare pathways side-by-side, chat with our AI counsellor, and build a personalised action plan.',
   },
 ]
 
-const BENEFITS = [
+const FEATURES = [
   {
-    icon: CheckCircle2,
-    title: 'Explainable results',
-    body: 'Every recommendation shows exactly which interests, skills, and preferences drove it — no black-box answers.',
+    icon: BarChart3,
+    title: 'Explainable matches',
+    body: 'See a dimension-by-dimension score breakdown for every career — no black-box algorithms.',
   },
   {
-    icon: Target,
-    title: 'Personalised roadmaps',
-    body: 'Get a step-by-step action plan for your top career match, from foundation skills to certifications and first roles.',
+    icon: BookOpen,
+    title: 'Detailed roadmaps',
+    body: 'Step-by-step learning plans for 50+ careers, with resources, certifications, and milestones.',
+  },
+  {
+    icon: Scale,
+    title: 'Side-by-side comparison',
+    body: 'Compare up to 3 careers across salary, demand, skills, and work-life balance simultaneously.',
   },
   {
     icon: MessageCircleHeart,
-    title: 'Guided counsellor',
-    body: 'Ask questions, compare pathways, and get structured guidance based on your actual saved assessment profile.',
+    title: 'AI career counsellor',
+    body: 'Chat with our AI counsellor for personalised guidance based on your assessment results.',
   },
+  {
+    icon: Target,
+    title: 'Goal tracking',
+    body: 'Set milestones, link them to careers, and track your progress toward your chosen path.',
+  },
+  {
+    icon: Users,
+    title: 'Built for India',
+    body: 'Career data includes government opportunities, entrance exams, and Indian salary benchmarks.',
+  },
+]
+
+const DEMO_MATCHES = [
+  { rank: 1, name: 'Data Scientist', score: 89 },
+  { rank: 2, name: 'Product Manager', score: 84 },
+  { rank: 3, name: 'UX Designer', score: 79 },
 ]
 
 const TESTIMONIALS = [
   {
-    quote: '"I had no idea which engineering branch to pick after Class 12. Pathwise showed me that my love of maths and systems thinking pointed clearly toward data science — and gave me a concrete plan."',
-    name: 'Aditi R.',
-    role: 'Engineering student, Pune',
+    quote: '"Pathwise showed me why software engineering fit my profile so precisely. The dimension scores gave me the confidence to switch streams after Class 12."',
+    name: 'Priya S.',
+    detail: 'Class 12 student, Mumbai',
+    initials: 'PS',
   },
   {
-    quote: '"As a career switcher, I needed something that would acknowledge my existing strengths. Pathwise mapped my project management skills to product roles in a way no counsellor ever had."',
-    name: 'Sandeep M.',
-    role: 'Career switcher, Bengaluru',
+    quote: '"I was torn between MBA and civil services. The side-by-side comparison and counsellor chat helped me make an informed decision in under an hour."',
+    name: 'Rahul M.',
+    detail: 'Undergraduate, Delhi',
+    initials: 'RM',
   },
   {
-    quote: '"The compare tool helped me finally decide between law and civil services. Seeing the full skill gap breakdown made the choice obvious."',
-    name: 'Priya K.',
-    role: 'Postgraduate student, Delhi',
+    quote: '"The roadmap for UX design was incredibly detailed. I knew exactly which courses to take and what to build for my portfolio."',
+    name: 'Anjali K.',
+    detail: 'Career switcher, Bengaluru',
+    initials: 'AK',
   },
 ]
 
-const HERO_MATCHES = [
-  { name: 'Data Scientist', reason: 'Investigative interest · Analytical strength', percent: '89%' },
-  { name: 'Product Manager', reason: 'Enterprising interest · Leadership fit', percent: '81%' },
-  { name: 'UX Designer', reason: 'Artistic interest · Creativity preference', percent: '74%' },
-]
+// ── Component ────────────────────────────────────────────────────────────────
 
 export default function Home() {
   const { isAuthenticated } = useApp()
 
   return (
-    <div>
-      {/* Hero */}
+    <>
+      {/* ── Hero ─────────────────────────────────────────────────────── */}
       <section className="hero">
         <div className="hero__grid">
-          <div>
-            <p className="eyebrow">Career guidance, made personal</p>
-            <h1>Find the career that <em>fits you</em></h1>
+          <div className="animate-slide-up">
+            <p className="eyebrow">Career guidance · Made for India</p>
+            <h1>
+              Find your{' '}
+              <em style={{ color: 'var(--primary)', fontStyle: 'normal' }}>path</em>
+              .<br />Not just a career.
+            </h1>
             <p className="hero__copy">
-              Pathwise uses a reflective 36-question assessment to map your interests, skills, personality, and values to real career pathways — with transparent scores and step-by-step plans.
+              Pathwise uses your interests, strengths, values, and work preferences to
+              recommend careers that actually fit you — with complete transparency on why.
             </p>
             <div className="hero__actions">
-              {isAuthenticated ? (
-                <Link to="/dashboard"><Button size="lg">Go to my dashboard</Button></Link>
-              ) : (
-                <>
-                  <Link to="/register"><Button size="lg">Start free assessment</Button></Link>
-                  <Link to="/careers"><Button variant="secondary" size="lg">Explore careers</Button></Link>
-                </>
-              )}
+              <Link to={isAuthenticated ? '/assessment' : '/register'}>
+                <Button variant="primary" size="lg">
+                  Start your assessment <ArrowRight size={17} />
+                </Button>
+              </Link>
+              <Link to="/careers">
+                <Button variant="secondary" size="lg">
+                  Explore careers
+                </Button>
+              </Link>
             </div>
-            <p className="trust-line"><CheckCircle2 size={15} /> Free demo · No account required to browse · Results explained, not just listed</p>
+            <div className="trust-line">
+              <CheckCircle2 size={16} />
+              Free forever · No account needed to explore · Explainable results
+            </div>
           </div>
 
-          {/* Insight card */}
-          <div>
-            <div className="hero-insight">
-              <div className="hero-insight__top">
-                <span className="hero-insight__label">Sample career matches</span>
-                <Tag tone="teal">Demo data</Tag>
-              </div>
-              {HERO_MATCHES.map((match) => (
-                <div key={match.name} className="hero-match">
-                  <div className="hero-match__number">{HERO_MATCHES.indexOf(match) + 1}</div>
-                  <div>
-                    <div className="hero-match__name">{match.name}</div>
-                    <div className="hero-match__reason">{match.reason}</div>
+          {/* Demo card */}
+          <div className="hero-demo-card animate-slide-up delay-200">
+            <div className="hero-demo-card__header">
+              <span>Your top matches</span>
+              <ScoreBadge score={89} label="avg" />
+            </div>
+            {DEMO_MATCHES.map((m) => (
+              <div key={m.rank} className="hero-demo-match">
+                <span className="hero-demo-match__rank">{m.rank}</span>
+                <div>
+                  <div className="hero-demo-match__name">{m.name}</div>
+                  <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: 2 }}>
+                    Based on your interests & skills
                   </div>
-                  <div className="hero-match__percent">{match.percent}</div>
                 </div>
-              ))}
-              <div style={{ marginTop: 18 }}>
-                <p className="demo-disclaimer">Illustrative demo data only. Actual scores depend on your own responses.</p>
+                <span className="hero-demo-match__score">{m.score}%</span>
               </div>
+            ))}
+            <div
+              style={{
+                marginTop: 14,
+                padding: '10px 14px',
+                background: '#f0f5ff',
+                borderRadius: 10,
+                fontSize: '.76rem',
+                color: '#3655a0',
+                lineHeight: 1.5,
+              }}
+            >
+              ✦ Sample results — take the assessment to see your real matches
             </div>
           </div>
         </div>
       </section>
 
-      {/* Logo line */}
-      <div className="logo-line">Trusted approach · Reflective assessment · Explainable scoring · 50+ Indian career pathways</div>
+      {/* ── Stats bar ─────────────────────────────────────────────────── */}
+      <div className="stats-bar">
+        <div className="stats-bar__inner">
+          {[
+            { number: '50+', label: 'Career profiles' },
+            { number: '36', label: 'Assessment questions' },
+            { number: '6', label: 'Scoring dimensions' },
+            { number: '100%', label: 'Free to use' },
+          ].map((s, i) => (
+            <div key={s.label} className="stat-item animate-fade-in" style={{ animationDelay: `${i * 0.1}s` }}>
+              <span className="stat-item__number">{s.number}</span>
+              <span className="stat-item__label">{s.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
 
-      {/* How it works */}
+      {/* ── How it works ──────────────────────────────────────────────── */}
       <section className="page-section">
         <div className="page-container">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">How it works</p>
-              <h2>Three steps to a clearer direction</h2>
-              <p className="section-heading__copy">No vague advice, no one-size-fits-all lists. Just a thoughtful process that starts with you.</p>
-            </div>
-          </div>
-          <div className="step-grid">
-            {STEPS.map((step) => (
-              <div key={step.number} className="step-card">
+          <SectionHeading
+            eyebrow="How it works"
+            title="Three steps to clarity"
+            copy="Our research-backed process guides you from self-discovery to a concrete action plan in under 15 minutes."
+            center
+          />
+          <div className="step-grid" style={{ marginTop: 36 }}>
+            {STEPS.map((step, i) => (
+              <div key={step.number} className={`step-card animate-slide-up delay-${(i + 1) * 100}`}>
                 <div className="step-card__number">{step.number}</div>
                 <h3>{step.title}</h3>
                 <p>{step.body}</p>
@@ -178,26 +237,35 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Career categories */}
-      <section className="page-section page-section--tight" style={{ background: '#f7f9ff' }}>
+      {/* ── Career categories ─────────────────────────────────────────── */}
+      <section className="page-section" style={{ background: '#f8faff', borderTop: '1px solid #e8edf5', borderBottom: '1px solid #e8edf5' }}>
         <div className="page-container">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Explore by area</p>
-              <h2>Career categories</h2>
-            </div>
-            <div className="section-heading__action">
-              <Link to="/careers"><Button variant="soft" size="sm">View all careers</Button></Link>
-            </div>
-          </div>
-          <div className="career-category-grid">
-            {TOP_CATEGORIES.map(([category, count]) => {
-              const Icon = CATEGORY_ICONS[category] ?? Compass
+          <SectionHeading
+            eyebrow="50+ careers across 13 domains"
+            title="Explore career categories"
+            copy="From technology and finance to law and design — find careers that match your strengths."
+            action={
+              <Link to="/careers">
+                <Button variant="secondary" size="sm">
+                  View all careers <ArrowRight size={14} />
+                </Button>
+              </Link>
+            }
+          />
+          <div className="career-category-grid" style={{ marginTop: 28 }}>
+            {TOP_CATEGORIES.map(([cat, count], i) => {
+              const Icon = CATEGORY_ICONS[cat] ?? Compass
               return (
-                <Link key={category} to={`/careers?category=${encodeURIComponent(category)}`} className="category-tile">
-                  <div className="category-tile__icon"><Icon size={18} /></div>
+                <Link
+                  to={`/careers?category=${encodeURIComponent(cat)}`}
+                  key={cat}
+                  className={`category-tile animate-slide-up delay-${Math.min((i + 1) * 100, 400)}`}
+                >
+                  <div className="category-tile__icon">
+                    <Icon size={18} />
+                  </div>
                   <div>
-                    <strong>{category}</strong>
+                    <strong>{cat}</strong>
                     <span>{count} career{count !== 1 ? 's' : ''}</span>
                   </div>
                 </Link>
@@ -207,46 +275,46 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Benefits */}
+      {/* ── Features ──────────────────────────────────────────────────── */}
       <section className="page-section">
         <div className="page-container">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Why Pathwise</p>
-              <h2>Guidance you can actually act on</h2>
-            </div>
-          </div>
-          <div className="benefit-grid">
-            {BENEFITS.map((benefit) => (
-              <div key={benefit.title} className="benefit-card">
-                <div className="benefit-card__icon"><benefit.icon size={20} /></div>
-                <h3>{benefit.title}</h3>
-                <p>{benefit.body}</p>
+          <SectionHeading
+            eyebrow="Why Pathwise"
+            title="Built to give you real answers"
+            copy="Not another quiz that gives you a vague personality type. Pathwise shows its work."
+            center
+          />
+          <div className="feature-grid" style={{ marginTop: 36 }}>
+            {FEATURES.map((f, i) => (
+              <div key={f.title} className={`feature-card animate-slide-up delay-${Math.min((i + 1) * 100, 400)}`}>
+                <div className="feature-card__icon">
+                  <f.icon size={22} />
+                </div>
+                <h3>{f.title}</h3>
+                <p>{f.body}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Testimonials */}
-      <section className="page-section page-section--tight" style={{ background: '#f7f9ff' }}>
+      {/* ── Testimonials ─────────────────────────────────────────────── */}
+      <section className="page-section" style={{ background: '#f8faff', borderTop: '1px solid #e8edf5', borderBottom: '1px solid #e8edf5' }}>
         <div className="page-container">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">From learners</p>
-              <h2>What people say</h2>
-              <p className="section-heading__copy muted" style={{ fontSize: '.8rem' }}>Illustrative demo testimonials.</p>
-            </div>
-          </div>
-          <div className="testimonial-grid">
+          <SectionHeading
+            eyebrow="Student stories"
+            title="What people are saying"
+            center
+          />
+          <div className="testimonial-grid" style={{ marginTop: 32 }}>
             {TESTIMONIALS.map((t) => (
-              <div key={t.name} className="testimonial">
+              <div key={t.name} className="testimonial animate-slide-up">
                 <p className="testimonial__quote">{t.quote}</p>
                 <div className="testimonial__person">
-                  <span className="avatar">{t.name[0]}</span>
+                  <div className="avatar">{t.initials}</div>
                   <div>
                     <strong>{t.name}</strong>
-                    <span>{t.role}</span>
+                    <span>{t.detail}</span>
                   </div>
                 </div>
               </div>
@@ -255,20 +323,25 @@ export default function Home() {
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="page-section">
-        <div className="page-container" style={{ textAlign: 'center' }}>
-          <p className="eyebrow">Ready to start?</p>
-          <h2 style={{ fontSize: 'clamp(2rem, 4vw, 3rem)', marginBottom: 14 }}>Your career direction starts here</h2>
-          <p style={{ maxWidth: 520, margin: '0 auto 28px', color: 'var(--muted)', lineHeight: 1.65 }}>
-            Take the free assessment and get personalised career matches with skill-gap analysis and roadmaps — all explained in plain language.
+      {/* ── CTA banner ────────────────────────────────────────────────── */}
+      <section className="cta-banner">
+        <div className="page-container">
+          <h2>Ready to find your fit?</h2>
+          <p>
+            Take the free 8-minute assessment and get a personalised list of careers ranked by how
+            well they match your profile — with transparent scores and a concrete action plan.
           </p>
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <Link to="/register"><Button size="lg">Get started — it's free</Button></Link>
-            <Link to="/about"><Button variant="secondary" size="lg">How it works</Button></Link>
-          </div>
+          <Link to={isAuthenticated ? '/assessment' : '/register'}>
+            <Button
+              variant="secondary"
+              size="lg"
+              style={{ background: '#fff', color: 'var(--primary)', borderColor: 'transparent' }}
+            >
+              Start for free <ArrowRight size={17} />
+            </Button>
+          </Link>
         </div>
       </section>
-    </div>
+    </>
   )
 }

@@ -92,6 +92,8 @@ export interface AppContextValue {
   setPrimaryCareer: (careerId: string) => void
   toggleRoadmapItem: (itemId: string) => void
   sendMessage: (message: string) => void
+  addCounsellorMessage: (message: ChatMessage) => void
+  clearMessages: () => void
 }
 
 const AppContext = createContext<AppContextValue | null>(null)
@@ -434,6 +436,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }))
   }, [updateCurrent])
 
+  const addCounsellorMessage = useCallback((message: ChatMessage) => {
+    updateCurrent((current) => ({ ...current, messages: [...current.messages, message] }))
+  }, [updateCurrent])
+
+  const clearMessages = useCallback(() => {
+    updateCurrent((current) => ({ ...current, messages: [] }))
+  }, [updateCurrent])
+
   const value = useMemo<AppContextValue>(() => ({
     user: account ? { id: account.id, name: account.name, email: account.email, role: account.role, createdAt: account.createdAt } : null,
     profile: account?.profile ?? null,
@@ -459,7 +469,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setPrimaryCareer,
     toggleRoadmapItem,
     sendMessage,
-  }), [account, login, logout, register, resetAssessment, saveAnswer, sendMessage, setPrimaryCareer, submitAssessment, toggleRoadmapItem, toggleSavedCareer, updateOnboarding, updateProfile])
+    addCounsellorMessage,
+    clearMessages,
+  }), [account, login, logout, register, resetAssessment, saveAnswer, sendMessage, addCounsellorMessage, clearMessages, setPrimaryCareer, submitAssessment, toggleRoadmapItem, toggleSavedCareer, updateOnboarding, updateProfile])
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
 }
