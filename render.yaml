@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: pathwise-api
+    runtime: node
+    plan: free
+    buildCommand: npm install --include=dev && npx prisma generate
+    startCommand: npx tsx server/index.ts
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: FRONTEND_URL
+        value: https://devlalit1.github.io
