@@ -3,7 +3,7 @@ services:
     name: pathwise-api
     runtime: node
     plan: free
-    buildCommand: npm install --include=dev && npx prisma generate
+    buildCommand: npm install && npx prisma generate
     startCommand: npx tsx server/index.ts
     healthCheckPath: /api/health
     envVars:

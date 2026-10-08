@@ -45,7 +45,7 @@ function loadGoals(): Goal[] {
 }
 
 export default function Goals() {
-  const { user, recommendations } = useApp()
+  const { recommendations } = useApp()
   const { show } = useToast()
   const [goals, setGoals] = useState<Goal[]>(loadGoals)
   const [tab, setTab] = useState('all')
@@ -156,17 +156,18 @@ export default function Goals() {
         </div>
       </div>
 
-      <Tabs
-        value={tab}
-        onChange={setTab}
-        options={[
-          { value: 'all', label: `All (${counts.all})` },
-          { value: 'active', label: `Active (${counts.active})` },
-          { value: 'completed', label: `Completed (${counts.completed})` },
-        ]}
-        className="animate-slide-up"
-        style={{ marginBottom: 20, display: 'inline-flex' } as React.CSSProperties}
-      />
+      <div style={{ marginBottom: 20 }}>
+        <Tabs
+          value={tab}
+          onChange={setTab}
+          options={[
+            { value: 'all', label: `All (${counts.all})` },
+            { value: 'active', label: `Active (${counts.active})` },
+            { value: 'completed', label: `Completed (${counts.completed})` },
+          ]}
+          className="animate-slide-up"
+        />
+      </div>
 
       {filtered.length === 0 ? (
         <EmptyState

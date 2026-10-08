@@ -1,7 +1,7 @@
 import { ArrowRight, BookOpen, CheckCircle2, Compass, Star, Target, TrendingUp, Zap } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { Button, EmptyState, ProgressRing, ScoreBadge, Skeleton } from '../components/ui'
+import { Button, EmptyState, ProgressRing, Skeleton } from '../components/ui'
 import { useApp } from '../context/AppContext'
 
 function getGreeting() {
@@ -12,7 +12,8 @@ function getGreeting() {
 }
 
 export default function Dashboard() {
-  const { user, recommendations, assessmentProfile, roadmapProgress, savedCareerIds, primaryCareerId, assessmentHistory } = useApp()
+  const { user, recommendations, assessmentProfile, roadmapProgress, savedCareerIds, assessmentHistory } = useApp()
+
 
   const isLoading = false // would be true during API fetch
   const hasAssessment = assessmentProfile !== null && recommendations.length > 0

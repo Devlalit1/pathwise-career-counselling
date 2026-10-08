@@ -11,7 +11,6 @@ import {
   Menu,
   MessageCircleHeart,
   Route,
-  Settings,
   ShieldCheck,
   Target,
   X,
