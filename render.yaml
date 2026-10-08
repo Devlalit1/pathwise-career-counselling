@@ -4,7 +4,7 @@ services:
     runtime: node
     plan: free
     buildCommand: npm install && npx prisma generate
-    startCommand: npx tsx server/index.ts
+    startCommand: node_modules/.bin/tsx server/index.ts
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
